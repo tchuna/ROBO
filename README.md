@@ -1,2 +1,6 @@
 # ROBO
-ROBO Project
+## ROBO Project
+### cd app
+### npm install
+### DEBUG=app:* npm start
+

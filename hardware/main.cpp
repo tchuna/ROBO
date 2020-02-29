@@ -10,6 +10,10 @@
 //LED PIN
 #define LED PB5
 
+//INTERRUPTS
+#define INT_0 PD2
+#define INT_1 PD3
+
 //UART PARAMETERS
 #ifndef F_CPU
 #define F_CPU 16000000ul
@@ -18,8 +22,8 @@
 //#define MY_UBRR F_CPU/16/BAUD-1
 #define MY_UBRR 103
 
-Motor motorLeft = Motor(PD4,PD7,PD5);
-Motor motorRight = Motor(PB0,PB4,PD6);
+Motor motorLeft = Motor(PD4,PD7,PD5); //motorB
+Motor motorRight = Motor(PB0,PB4,PD6); //motorA 
 
 void setup_PWM_timer0(){
 //clear
@@ -56,11 +60,17 @@ UCSR0B = (1<<RXEN0) | (1<<TXEN0);
 UCSR0B |= (1<<RXCIE0); //enable receive interrupt
 }
 
+void setup_external_interrupt(){
+//type of interrupt request (in this case its set to rising edge)
+EICRA |= (1<<ISC01) | (1<<ISC00);
+
+//enable interrupt (in this case its INT0)
+EIMSK |= (1<<INT0);
+}
+
 ISR(USART_RX_vect){
-  uint8_t data;
-  //double toggle to signal data received
-  PORTB=PORTB^(1<<LED);
-  PORTB=PORTB^(1<<LED);
+  char data;
+  //toggle to signal data received
   data = UDR0;
 
   if(data=='h'){
@@ -68,43 +78,65 @@ ISR(USART_RX_vect){
     OCR0B=250;
     PORTB=PORTB^(1<<LED);
   }
-  if(data=='l'){
-    OCR0A=50;
-    OCR0B=50;
+  else if(data=='l'){
+    OCR0A=60;
+    OCR0B=60;
     PORTB=PORTB^(1<<LED);
   }
 
-  if(data=='n'){
+  else if(data=='s'){
     OCR0A=0;
     OCR0B=0;
     PORTB=PORTB^(1<<LED);
   }
+  else if(data=='t'){
+    PORTB=PORTB^(1<<LED);
+    
+    PORTD=PORTD^(1<<PD4);
+    PORTD=PORTD^(1<<PD7);
+    PORTB=PORTB^(1<<PB0);
+    PORTB=PORTB^(1<<PB4);
+  }
 }
 
-ISR(TIMER0_COMPA_vect){
+ISR(INT0_vect){
   PORTB=PORTB^(1<<LED);
 }
 
 int main(void){
-  DDRD |= (1<<motorLeft.getPinFWD());
-  DDRD |= (1<<motorLeft.getPinBWD());
-  DDRD |= (1<<motorLeft.getPinPWM());
-
-  DDRB |= (1<<motorRight.getPinFWD());
-  DDRB |= (1<<motorRight.getPinBWD());
-  DDRD |= (1<<motorRight.getPinPWM());
-  //DDRB |= (1<<motorRight.getPinPWM());
-
+  /* OUTPUTS */
+  //MOTOR PINS
+  //LEFT MOTOR
+  DDRD |= (1<<PD4);
+  DDRD |= (1<<PD7);
+  DDRD |= (1<<PD5);
+  //RIGHT MOTOR
+  DDRB |= (1<<PB0);
+  DDRB |= (1<<PB4);
+  DDRD |= (1<<PD6);
+  //LED PB5
   DDRB |= (1<<LED);
+
+  /* INPUTS */
+  //INTERRUPT INT0
+  DDRD &= ~(1<<INT_0);
+  //ACTIVATE INTERNAL PULL-UP TO AVOID FLUCTUATION
+  PORTD |= (1<<INT_0);
+  
+  //start motors in forward direction
+  PORTD|=(1<<PD4);
+  PORTB|=(1<<PB0);
+
+  //activate INTERRUPT
+  //PORTD|=(1<<INT0);
+
 
   setup_PWM_timer0();
   init_UART_communication(9600);
+  setup_external_interrupt();
 
   sei();
-  while(1){
-    //OCR0B++;
-    //OCR0A++;
-    //_delay_ms(PWM_CHANGE_RATE);
-  }
+
+  while(1);
   return 0;
 }
